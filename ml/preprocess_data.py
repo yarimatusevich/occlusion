@@ -61,9 +61,9 @@ def convert_video_to_cropped_frames(video_filepath, is_looking=True):
             # splitting into classes in data folder
             if face_crop is not None:
                 if is_looking:
-                    cv2.imwrite(f'data/looking/frame_{count}.jpg', face_crop)
+                    cv2.imwrite(f'ml/data/looking/frame_{count}.jpg', face_crop)
                 else:
-                    cv2.imwrite(f'data/not_looking/frame_{count}.jpg', face_crop)
+                    cv2.imwrite(f'ml/data/not_looking/frame_{count}.jpg', face_crop)
 
         count += 1
 
@@ -71,8 +71,8 @@ def convert_video_to_cropped_frames(video_filepath, is_looking=True):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    os.makedirs('data/train/looking', exist_ok=True)
-    os.makedirs('data/train/not_looking', exist_ok=True)
+    os.makedirs('ml/data/looking', exist_ok=True)
+    os.makedirs('ml/data/not_looking', exist_ok=True)
 
-    convert_video_to_cropped_frames('raw_data/looking.mov')
-    convert_video_to_cropped_frames(video_filepath='raw_data/not_looking.mov', is_looking=False)
+    convert_video_to_cropped_frames('ml/raw_data/looking.mov')
+    convert_video_to_cropped_frames(video_filepath='ml/raw_data/not_looking.mov', is_looking=False)

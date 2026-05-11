@@ -61,7 +61,7 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
 
         # saves frame with label from model if true
         if save_labeled_frames:
-            cv.imwrite(f'labeled_data/frame_{frame_num}.png', frame)
+            cv.imwrite(f'ml/labeled_data/frame_{frame_num}.png', frame)
 
         # press 'q' to stop feed
         if cv.waitKey(1) == ord('q'):
@@ -74,7 +74,7 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
 
 if __name__ == '__main__':
     model = CNN()
-    state_dict = torch.load('model.pth', weights_only=True)
+    state_dict = torch.load('ml/model.pth', weights_only=True)
 
     # loading model and setting to evaluation mode
     model.load_state_dict(state_dict)
