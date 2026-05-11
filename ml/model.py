@@ -3,6 +3,7 @@ from torch import optim
 from torch import nn
 from torchvision import datasets, transforms
 from torch.utils.data import random_split, DataLoader
+import coremltools as ct
 
 '''
 Overfitting: training loss going down almost zero, val loss not decreasing (Overfitting)
@@ -119,7 +120,7 @@ def train(model, num_epochs, train_loader, validation_loader):
         # computing avg loss for current epoch
         val_loss /= len(validation_loader)
 
-        # early stopping logic
+        # early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             epochs_with_no_improvement = 0
@@ -134,6 +135,23 @@ def train(model, num_epochs, train_loader, validation_loader):
 
         # printing training and validation loss
         print(f'Epoch {epoch + 1} - Training loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}')
+
+def save_model_to_coreml_format():
+    model = CNN()
+    state_dict = torch.load('model.pth', weights_only=True)
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    trace_input = torch.rand(1, 3, 128, 128)
+    traced_model = torch.jit.trace(model, trace_input)
+
+    coreml_model = ct.convert(
+        traced_model,
+        convert_to='ml_program',
+        inputs=[ct.TensorType(shape=trace_input.shape)]
+    )
+
+    coreml_model.save('occlusion_model.mlpackage')
 
 if __name__ == '__main__':
     device = 'mps' if torch.mps.is_available() else 'cpu'
