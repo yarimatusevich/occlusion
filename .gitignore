@@ -1,0 +1,6 @@
+.idea/
+__pycache__
+.DS_Store
+raw_data/
+data/
+labeled_data/
