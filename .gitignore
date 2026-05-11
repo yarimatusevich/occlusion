@@ -4,3 +4,5 @@ __pycache__
 raw_data/
 data/
 labeled_data/
+*.pth
+*.mlpackage
