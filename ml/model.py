@@ -138,7 +138,7 @@ def train(model, num_epochs, train_loader, validation_loader):
 
 def save_model_to_coreml_format():
     model = CNN()
-    state_dict = torch.load('model.pth', weights_only=True)
+    state_dict = torch.load('model.pth', weights_only=True, map_location='cpu')
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -147,18 +147,23 @@ def save_model_to_coreml_format():
 
     coreml_model = ct.convert(
         traced_model,
-        convert_to='ml_program',
+        convert_to='mlprogram',
         inputs=[ct.TensorType(shape=trace_input.shape)]
     )
 
-    coreml_model.save('occlusion_model.mlpackage')
+    coreml_model.save('ml/occlusion_model.mlpackage')
 
 if __name__ == '__main__':
+    # init model
     device = 'mps' if torch.mps.is_available() else 'cpu'
     model = CNN().to(device)
 
+    # init loss function and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
+    # loading data and training model
     train_loader, validation_loader = load_data(filepath='./data', batchsize=BATCH_SIZE)
     train(model=model, num_epochs=NUM_EPOCHS, train_loader=train_loader, validation_loader=validation_loader)
+
+    save_model_to_coreml_format()
