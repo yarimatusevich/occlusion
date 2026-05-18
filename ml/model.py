@@ -148,22 +148,23 @@ def save_model_to_coreml_format():
     coreml_model = ct.convert(
         traced_model,
         convert_to='mlprogram',
-        inputs=[ct.TensorType(shape=trace_input.shape)]
+        inputs=[ct.ImageType(shape=(1, 128, 128, 3))]
     )
 
     coreml_model.save('ml/occlusion_model.mlpackage')
 
 if __name__ == '__main__':
-    # init model
-    device = 'mps' if torch.mps.is_available() else 'cpu'
-    model = CNN().to(device)
+    if (False):
+        # init model
+        device = 'mps' if torch.mps.is_available() else 'cpu'
+        model = CNN().to(device)
 
-    # init loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        # init loss function and optimizer
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    # loading data and training model
-    train_loader, validation_loader = load_data(filepath='./data', batchsize=BATCH_SIZE)
-    train(model=model, num_epochs=NUM_EPOCHS, train_loader=train_loader, validation_loader=validation_loader)
+        # loading data and training model
+        train_loader, validation_loader = load_data(filepath='./data', batchsize=BATCH_SIZE)
+        train(model=model, num_epochs=NUM_EPOCHS, train_loader=train_loader, validation_loader=validation_loader)
 
     save_model_to_coreml_format()
