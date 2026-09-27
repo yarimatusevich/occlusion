@@ -1,5 +1,7 @@
 import torch
 from torchvision.transforms import v2
+from torchvision import datasets
+from PIL.Image import Image as PILImage
 
 HEIGHT, WIDTH = 128, 128
 channel_means = [0.5, 0.5, 0.5]
@@ -23,3 +25,9 @@ inference_transforms = v2.Compose([
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=channel_means, std=channel_stds)
 ])
+
+def transform_training_data(filepath: str):
+    return datasets.ImageFolder(filepath, transform=train_transforms)
+
+def transform_image_for_inference(image: PILImage):
+    return inference_transforms(image)
