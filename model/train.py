@@ -1,164 +1,99 @@
 import torch
-from torch import optim
-from torch import nn
-from torchvision import datasets, transforms
-from torch.utils.data import random_split, DataLoader
-import coremltools as ct
+import torch.nn as nn
+from torch.utils.data import DataLoader, random_split
+import lightning as L
 
-inference_transform = transforms.Compose([
-        transforms.ToTensor()
-])
+from data_transforms import transform_training_data
 
-BATCH_SIZE = 64
-LEARNING_RATE = 0.001
+fabric = L.Fabric(accelerator='mps')
+
+BATCH_SIZE = 32
 NUM_EPOCHS = 50
 
-class CNN(nn.Module):
+class Model(nn.Module):
     def __init__(self):
-        super(CNN, self).__init__()
+        super(Model, self).__init__()
 
-        # images are rgb, so in_channels=3
-        # conv layers
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        def block(in_channels: int, out_channels: int):
+            return nn.Sequential(
+                nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.ReLU()
+            )
 
-        # pooling, relu, fully-connected layer
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.relu = nn.ReLU()
+        self.conv_layers = nn.Sequential(
+            # 128 x 128 x 3 input
+            block(in_channels=3, out_channels=32),
+            # 64 x 64 x 32
+            block(in_channels=32, out_channels=64),
+            # 32 x 32 x 64
+            block(in_channels=64, out_channels=128)
+        )
+
+        # 16 x 16 x 128 matrix needs to be flattened
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(in_features=16*16*128, out_features=2)
-        self.dropout = nn.Dropout(p=0.25)
+        self.fc = nn.Linear(in_features=16 * 16 * 128, out_features=2)
 
     def forward(self, x):
-        # pool into 64x64x32
-        x = self.relu(self.conv1(x))
-        x = self.pool(x)
-
-        # pool into 32x32x64
-        x = self.relu(self.conv2(x))
-        x = self.pool(x)
-
-        # pool into 16x16x128
-        x = self.relu(self.conv3(x))
-        x = self.pool(x)
-
-        # flatten and pass to fully-connected layer
+        x = self.conv_layers(x)
         x = self.flatten(x)
-        x = self.fc1(x)
-        x = self.dropout(x)
+        x = self.fc(x)
 
         return x
 
-def load_data(filepath: str, batchsize: int):
-    # todo: might add some normalization here
-    # for now just converts to tensors
 
-    dataset = datasets.ImageFolder(root=filepath, transform=inference_transform)
-    generator = torch.default_generator.manual_seed(42)
+def create_train_val_data_loaders(filepath: str, batch_size: int):
+    dataset = transform_training_data(filepath)
 
-    # calculating split sizes from data
     train_size = int(0.8 * len(dataset))
     validation_size = len(dataset) - train_size
 
-    # splitting datasets
     train_data, validation_data = random_split(
-        dataset=dataset, lengths=[train_size, validation_size], generator=generator
+        dataset, lengths=[train_size, validation_size]
     )
 
-    # creating loaders for mini-batch gradient descent
-    train_loader = DataLoader(dataset=train_data, batch_size=batchsize, shuffle=True)
-    validation_loader = DataLoader(dataset=validation_data, batch_size=batchsize, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(validation_data, batch_size=batch_size)
 
-    return train_loader, validation_loader
+    return train_loader, val_loader
 
-def train(model, num_epochs, train_loader, validation_loader):
-    best_val_loss = float('inf')
-    epochs_with_no_improvement = 0
-    patience = 5
+
+def train(model, num_epochs, dataloaders: tuple[DataLoader, DataLoader]):
+    optimizer = torch.optim.AdamW(model.parameters())
+    criterion = nn.CrossEntropyLoss()
+    model, optimizer = fabric.setup(model, optimizer)
+    train_loader, val_loader = fabric.setup_dataloaders(*dataloaders)
 
     for epoch in range(num_epochs):
         model.train()
-        train_loss = 0
-
-        for data, targets in train_loader:
-            # putting imgs and labels to device
-            data = data.to(device)
-            targets = targets.to(device)
-
-            # clear previous gradient
+        train_loss = 0.0
+        for batch in train_loader:
+            features, targets = batch
             optimizer.zero_grad()
 
-            scores = model(data)
-            loss = criterion(scores, targets)
+            logits = model(features)
+            loss = criterion(logits, targets)
+            train_loss += loss
 
-            # summing loss for epoch
-            train_loss += loss.item()
-
-            # compute gradient and update weights
-            loss.backward()
+            fabric.backward(loss)
             optimizer.step()
 
-        # computing avg training loss for current epoch
-        train_loss /= len(train_loader)
-
         model.eval()
-        val_loss = 0
+        val_loss, correct, total = 0.0, 0, 0
         with torch.no_grad():
-            for data, targets in validation_loader:
-                data = data.to(device)
-                targets = targets.to(device)
-                scores = model(data)
-                val_loss += criterion(scores, targets).item()
+            for features, targets in val_loader:
+                logits = model(features)
+                val_loss += criterion(logits, targets).item()
+                correct += (logits.argmax(dim=1) == targets).sum().item()
+                total += targets.size(0)
 
-        # computing avg loss for current epoch
-        val_loss /= len(validation_loader)
+        print(f"epoch {epoch + 1}: train_loss={train_loss / len(train_loader):.4f} "
+              f"val_loss={val_loss / len(val_loader):.4f} val_acc={correct / total:.3f}")
 
-        # early stopping
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            epochs_with_no_improvement = 0
-            torch.save(model.state_dict(), 'model.pth')
-        else:
-            epochs_with_no_improvement += 1
-
-        # early stop
-        if epochs_with_no_improvement == patience:
-            print(f'Early Stopping at epoch {epoch + 1}')
-            break
-
-        # printing training and validation loss
-        print(f'Epoch {epoch + 1} - Training loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}')
-
-def save_model_to_coreml_format():
-    model = CNN()
-    state_dict = torch.load('model.pth', weights_only=True, map_location='cpu')
-    model.load_state_dict(state_dict)
-    model.eval()
-
-    trace_input = torch.rand(1, 3, 128, 128)
-    traced_model = torch.jit.trace(model, trace_input)
-
-    coreml_model = ct.convert(
-        traced_model,
-        convert_to='mlprogram',
-        inputs=[ct.ImageType(shape=(1, 128, 128, 3))]
-    )
-
-    coreml_model.save('ml/occlusion_model.mlpackage')
 
 if __name__ == '__main__':
-    if (False):
-        # init model
-        device = 'mps' if torch.mps.is_available() else 'cpu'
-        model = CNN().to(device)
+    fabric.seed_everything(42)
 
-        # init loss function and optimizer
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-
-        # loading data and training model
-        train_loader, validation_loader = load_data(filepath='./data', batchsize=BATCH_SIZE)
-        train(model=model, num_epochs=NUM_EPOCHS, train_loader=train_loader, validation_loader=validation_loader)
-
-    save_model_to_coreml_format()
+    model = Model()
+    dataloaders = create_train_val_data_loaders('../data/', BATCH_SIZE)
+    train(model, NUM_EPOCHS, dataloaders)
