@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader, random_split
 import lightning as L
 
 from data_transforms import transform_training_data
-from ml.model import OcclusionModel
+from ml.occlusion_model import OcclusionModel
 
 fabric = L.Fabric(accelerator='mps')
 
@@ -32,9 +32,6 @@ def train(model, num_epochs, dataloaders: tuple[DataLoader, DataLoader]):
     criterion = nn.CrossEntropyLoss()
     model, optimizer = fabric.setup(model, optimizer)
     train_loader, val_loader = fabric.setup_dataloaders(*dataloaders)
-
-    CHECKPOINT_DIR.mkdir(exist_ok=True)
-    best_val_loss = float('inf')
 
     for epoch in range(num_epochs):
         model.train()
@@ -64,11 +61,8 @@ def train(model, num_epochs, dataloaders: tuple[DataLoader, DataLoader]):
         print(f"epoch {epoch + 1}: train_loss={train_loss / len(train_loader):.4f} "
               f"val_loss={val_loss:.4f} val_acc={correct / total:.3f}")
 
-        state = {
-            'model': model,
-            'optimizer': optimizer,
-        }
-        fabric.save(CHECKPOINT_DIR / 'last.ckpt', state)
+    model_state = model.state_dict()
+    fabric.save('../model.pth', model_state)
 
 
 if __name__ == '__main__':

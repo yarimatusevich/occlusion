@@ -1,8 +1,10 @@
 import cv2
 import torch
 import cv2 as cv
-from model import inference_transform, CNN
-from preprocess_data import crop_face_from_frame
+from PIL import Image
+from ml.occlusion_model import OcclusionModel
+from ml.data_transforms import transform_image_for_inference
+from prepare_dataset import crop_face_from_frame
 
 LOOKING_THRESHOLD = 0.5
 
@@ -14,10 +16,13 @@ def detect_gaze(model, frame):
         # if face not found return not_looking class
         return 1
 
-    face_crop_transformed = inference_transform(face_crop)
+    # opencv frames are BGR numpy arrays, transforms expect an RGB PIL image
+    face_crop_image = Image.fromarray(cv.cvtColor(face_crop, cv.COLOR_BGR2RGB))
+    face_crop_transformed = transform_image_for_inference(face_crop_image)
 
     # take class with the greatest probability as prediction
-    scores = model(face_crop_transformed.unsqueeze(0))
+    with torch.no_grad():
+        scores = model(face_crop_transformed.unsqueeze(0))
     probs = torch.softmax(scores, 1)
     looking_confidence = probs[0][0]
 
@@ -73,8 +78,8 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
     cv.destroyAllWindows()
 
 if __name__ == '__main__':
-    model = CNN()
-    state_dict = torch.load('model.pth', weights_only=True)
+    model = OcclusionModel()
+    state_dict = torch.load('model.pth', weights_only=True, map_location='mps')
 
     # loading model and setting to evaluation mode
     model.load_state_dict(state_dict)
