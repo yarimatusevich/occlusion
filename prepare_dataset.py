@@ -1,78 +1,57 @@
+from pathlib import Path
+
 import cv2
-import os
 
-face_classifier = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+from ml.face_crop import crop_face_from_frame
 
-def crop_face_from_frame(frame):
-    grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    faces = face_classifier.detectMultiScale(
-        grey_image,
-        1.1, # how much image is scaled down at each of detection
-        5, # num of overlapping detection needed for region to be counted as a real object
-        minSize=(40, 40) # min size of detection window
-    )
-
-    # model found no face
-    if len(faces) == 0:
-        return None
-
-    x, y, w, h = faces[0]
-
-    # adding padding to ensure entire face fits in bounding box
-    pad = int(0.2 * h)
-
-    # bounding box coordinates
-    x1 = max(0, x - pad)
-    y1 = max(0, y - pad)
-    x2 = min(frame.shape[1], x + w + pad)
-    y2 = min(frame.shape[0], y + h + pad)
-
-    face_crop = frame[y1:y2, x1:x2]
-    face_crop = cv2.resize(face_crop, (128, 128))
-
-    return face_crop
-
-def convert_video_to_cropped_frames(video_filepath, is_looking=True):
-    video_capture = cv2.VideoCapture(video_filepath)
-
-    if not video_capture:
-        print('ERROR: Failed to open video capture')
-        exit()
+# resolve paths from this file's location, not the current working directory
+ROOT = Path(__file__).resolve().parent
+RAW_DIR = ROOT / "ml" / "raw_data"
+DATA_DIR = ROOT / "ml" / "data"
+FRAME_STRIDE = 10  # keep every Nth frame
 
 
-    fps = video_capture.get(cv2.CAP_PROP_FPS)
-    num_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
-    print(f'FPS: {fps}, Total frames: {num_frames}, Duration: {num_frames / fps:.1f}s')
+def convert_video_to_cropped_frames(video_path: Path, out_dir: Path, stride: int = FRAME_STRIDE):
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Could not open video: {video_path}")
 
-    count = 0
-    while True:
-        success, frame = video_capture.read()
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-        if not success:
-            break
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = f"{num_frames / fps:.1f}s" if fps > 0 else "unknown"
+    print(f"{video_path.name}: FPS={fps:.1f}, frames={num_frames}, duration={duration}")
 
-        if count % 10 == 0:
-            print(f'Cropping frame: {count}')
-            face_crop = crop_face_from_frame(frame)
+    saved = skipped = 0
+    idx = 0
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
 
-            # splitting into classes in data folder
-            if face_crop is not None:
-                if is_looking:
-                    cv2.imwrite(f'ml/data/looking/frame_{count}.jpg', face_crop)
+            if idx % stride == 0:
+                face_crop = crop_face_from_frame(frame)
+                if face_crop is None:
+                    skipped += 1
                 else:
-                    cv2.imwrite(f'ml/data/not_looking/frame_{count}.jpg', face_crop)
+                    # prefix with the video name so multiple videos per class don't overwrite each other
+                    out_path = out_dir / f"{video_path.stem}_frame{idx:06d}.jpg"
+                    cv2.imwrite(str(out_path), face_crop)
+                    saved += 1
+            idx += 1
+    finally:
+        cap.release()
 
-        count += 1
+    print(f"{video_path.name}: saved {saved} crops, no face in {skipped} sampled frames")
+    return saved, skipped
 
-    video_capture.release()
-    cv2.destroyAllWindows()
 
-if __name__ == '__main__':
-    os.makedirs('ml/data/looking', exist_ok=True)
-    os.makedirs('ml/data/not_looking', exist_ok=True)
-
-    convert_video_to_cropped_frames('ml/raw_data/looking.mov')
-    convert_video_to_cropped_frames(video_filepath='ml/raw_data/not_looking.mov', is_looking=False)
+if __name__ == "__main__":
+    jobs = [
+        (RAW_DIR / "looking.mov", DATA_DIR / "looking"),
+        (RAW_DIR / "not_looking.mov", DATA_DIR / "not_looking"),
+    ]
+    for video_path, out_dir in jobs:
+        convert_video_to_cropped_frames(video_path, out_dir)
