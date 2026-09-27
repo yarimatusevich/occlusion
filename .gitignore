@@ -8,3 +8,4 @@ labeled_data/
 *.mlpackage
 *.xcuserstate
 xcuserdata/
+*.onnx
