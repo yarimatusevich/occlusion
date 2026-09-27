@@ -73,7 +73,7 @@ def train(model, num_epochs, dataloaders: tuple[DataLoader, DataLoader]):
 
             logits = model(features)
             loss = criterion(logits, targets)
-            train_loss += loss
+            train_loss += loss.item()
 
             fabric.backward(loss)
             optimizer.step()
