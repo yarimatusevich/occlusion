@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import cv2
@@ -46,6 +47,9 @@ def convert_video_to_cropped_frames(video_path: Path, out_dir: Path, stride: int
 
 
 if __name__ == "__main__":
+    # start from an empty folder so crops from earlier runs don't mix into the dataset
+    shutil.rmtree(DATA_DIR, ignore_errors=True)
+
     jobs = [
         (RAW_DIR / "looking.mov", DATA_DIR / "looking"),
         (RAW_DIR / "not_looking.mov", DATA_DIR / "not_looking"),

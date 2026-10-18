@@ -4,8 +4,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 MODELS_DIR = ROOT / "models"
-RAW_DIR = ROOT / "raw_data"
-DATA_DIR = ROOT / "data"
+RAW_DIR = ROOT / "data" / "raw"  # source videos, never modified
+DATA_DIR = ROOT / "data" / "processed"  # face crops generated from RAW_DIR, safe to delete
 LABELED_DIR = ROOT / "labeled_data"
 
 MODEL_PATH = MODELS_DIR / "model.pth"
