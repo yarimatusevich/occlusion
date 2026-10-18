@@ -1,15 +1,12 @@
-from pathlib import Path
-
 import cv2 as cv
 import gradio as gr
 import torch
 from PIL import Image
 
-from ml.occlusion_model import OcclusionModel
-from ml.data_transforms import transform_image_for_inference
 from ml.face_crop import crop_face_from_frame
-
-MODEL_PATH = Path(__file__).resolve().parent / "ml" / "models" / "model.pth"
+from ml.model import OcclusionModel
+from ml.paths import MODEL_PATH
+from ml.transforms import transform_image_for_inference
 
 
 def load_model():

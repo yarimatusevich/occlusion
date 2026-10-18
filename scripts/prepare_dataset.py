@@ -3,11 +3,8 @@ from pathlib import Path
 import cv2
 
 from ml.face_crop import crop_face_from_frame
+from ml.paths import DATA_DIR, RAW_DIR
 
-# resolve paths from this file's location, not the current working directory
-ROOT = Path(__file__).resolve().parent
-RAW_DIR = ROOT / "ml" / "raw_data"
-DATA_DIR = ROOT / "ml" / "data"
 FRAME_STRIDE = 10  # keep every Nth frame
 
 

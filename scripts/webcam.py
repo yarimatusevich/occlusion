@@ -1,10 +1,11 @@
-import cv2
-import torch
 import cv2 as cv
+import torch
 from PIL import Image
-from ml.occlusion_model import OcclusionModel
-from ml.data_transforms import transform_image_for_inference
+
 from ml.face_crop import crop_face_from_frame
+from ml.model import OcclusionModel
+from ml.paths import LABELED_DIR, MODEL_PATH
+from ml.transforms import transform_image_for_inference
 
 LOOKING_THRESHOLD = 0.5
 
@@ -59,14 +60,14 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
         # displaying feed with class prediction
         cv.putText(
             frame, prediction_str, (50, 50),
-            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 225, 0), 2
+            cv.FONT_HERSHEY_SIMPLEX, 1, (0, 225, 0), 2
         )
 
         cv.imshow('Webcam Feed', frame)
 
         # saves frame with label from model if true
         if save_labeled_frames:
-            cv.imwrite(f'labeled_data/frame_{frame_num}.png', frame)
+            cv.imwrite(str(LABELED_DIR / f'frame_{frame_num}.png'), frame)
 
         # press 'q' to stop feed
         if cv.waitKey(1) == ord('q'):
@@ -79,7 +80,7 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
 
 if __name__ == '__main__':
     model = OcclusionModel()
-    state_dict = torch.load('ml/models/model.pth', weights_only=True, map_location='mps')
+    state_dict = torch.load(MODEL_PATH, weights_only=True, map_location='mps')
 
     # loading model and setting to evaluation mode
     model.load_state_dict(state_dict)

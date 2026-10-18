@@ -3,8 +3,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import lightning as L
 
-from data_transforms import transform_training_data
-from ml.occlusion_model import OcclusionModel
+from ml.model import OcclusionModel
+from ml.paths import DATA_DIR, MODEL_PATH
+from ml.transforms import transform_training_data
 
 fabric = L.Fabric(accelerator='mps')
 
@@ -62,12 +63,12 @@ def train(model, num_epochs, dataloaders: tuple[DataLoader, DataLoader]):
               f"val_loss={val_loss:.4f} val_acc={correct / total:.3f}")
 
     model_state = model.state_dict()
-    fabric.save('../model.pth', model_state)
+    fabric.save(MODEL_PATH, model_state)
 
 
 if __name__ == '__main__':
     fabric.seed_everything(42)
 
     model = OcclusionModel()
-    dataloaders = create_train_val_data_loaders('../data/', BATCH_SIZE)
+    dataloaders = create_train_val_data_loaders(DATA_DIR, BATCH_SIZE)
     train(model, NUM_EPOCHS, dataloaders)

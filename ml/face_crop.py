@@ -1,13 +1,11 @@
-from pathlib import Path
-
 import cv2
+
+from ml.paths import FACE_DETECTOR_PATH
 
 FACE_SIZE = 128
 PAD_RATIO = 0.2          # padding on each side, as a fraction of the face box
 SCORE_THRESHOLD = 0.7    # min detection confidence (YuNet default is 0.9)
 NMS_THRESHOLD = 0.3
-
-MODEL_PATH = Path(__file__).resolve().parent / "models" / "face_detection_yunet_2023mar.onnx"
 
 _detector = None
 
@@ -16,13 +14,13 @@ def _get_detector():
     """Load YuNet once, on first use."""
     global _detector
     if _detector is None:
-        if not MODEL_PATH.exists():
+        if not FACE_DETECTOR_PATH.exists():
             raise FileNotFoundError(
-                f"YuNet model not found at {MODEL_PATH}. Download face_detection_yunet_2023mar.onnx "
-                "from the opencv_zoo repo into ml/models/."
+                f"YuNet model not found at {FACE_DETECTOR_PATH}. Download {FACE_DETECTOR_PATH.name} "
+                f"from the opencv_zoo repo into {FACE_DETECTOR_PATH.parent}."
             )
         _detector = cv2.FaceDetectorYN.create(
-            str(MODEL_PATH), "", (320, 320),
+            str(FACE_DETECTOR_PATH), "", (320, 320),
             score_threshold=SCORE_THRESHOLD,
             nms_threshold=NMS_THRESHOLD,
         )
