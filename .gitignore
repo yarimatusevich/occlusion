@@ -9,3 +9,4 @@ labeled_data/
 *.xcuserstate
 xcuserdata/
 *.onnx
+.claude/
