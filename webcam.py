@@ -4,7 +4,7 @@ import cv2 as cv
 from PIL import Image
 from ml.occlusion_model import OcclusionModel
 from ml.data_transforms import transform_image_for_inference
-from prepare_dataset import crop_face_from_frame
+from ml.face_crop import crop_face_from_frame
 
 LOOKING_THRESHOLD = 0.5
 
