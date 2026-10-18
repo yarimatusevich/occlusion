@@ -1,33 +1,21 @@
 import cv2 as cv
-import torch
-from PIL import Image
 
-from ml.face_crop import crop_face_from_frame
-from ml.model import OcclusionModel
-from ml.paths import LABELED_DIR, MODEL_PATH
-from ml.transforms import transform_image_for_inference
+from ml import inference
+from ml.paths import LABELED_DIR
 
 LOOKING_THRESHOLD = 0.5
 
 def detect_gaze(model, frame):
-    # cropping face from video frame and converting to tensors
-    face_crop = crop_face_from_frame(frame)
+    result = inference.predict(model, frame)
 
-    if face_crop is None:
+    if result is None:
         # if face not found return not_looking class
         return 1
 
-    # opencv frames are BGR numpy arrays, transforms expect an RGB PIL image
-    face_crop_image = Image.fromarray(cv.cvtColor(face_crop, cv.COLOR_BGR2RGB))
-    face_crop_transformed = transform_image_for_inference(face_crop_image)
+    probs, _ = result
+    looking_confidence = probs[0]
 
-    # take class with the greatest probability as prediction
-    with torch.no_grad():
-        scores = model(face_crop_transformed.unsqueeze(0))
-    probs = torch.softmax(scores, 1)
-    looking_confidence = probs[0][0]
-
-    # thresholding model has to be at least 75% user is looking to output looking class
+    # model has to be more than LOOKING_THRESHOLD confident user is looking to output looking class
     prediction = 0 if looking_confidence > LOOKING_THRESHOLD else 1
 
     return prediction
@@ -79,12 +67,7 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
     cv.destroyAllWindows()
 
 if __name__ == '__main__':
-    model = OcclusionModel()
-    state_dict = torch.load(MODEL_PATH, weights_only=True, map_location='mps')
-
-    # loading model and setting to evaluation mode
-    model.load_state_dict(state_dict)
-    model.eval()
+    model = inference.load_model(map_location='mps')
 
     # detecting gaze through live webcam feed
     start_live_webcam_feed(model, save_labeled_frames=False)

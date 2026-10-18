@@ -1,25 +1,10 @@
 import cv2 as cv
 import gradio as gr
-import torch
-from PIL import Image
 
-from ml.face_crop import crop_face_from_frame
-from ml.model import OcclusionModel
-from ml.paths import MODEL_PATH
-from ml.transforms import transform_image_for_inference
+from ml import inference
 
-
-def load_model():
-    model = OcclusionModel()
-    # using free hosting tier with access to cpu only
-    state_dict = torch.load(MODEL_PATH, weights_only=True, map_location='cpu')
-    model.load_state_dict(state_dict)
-    model.eval()
-
-    return model
-
-
-model = load_model()
+# using free hosting tier with access to cpu only
+model = inference.load_model(map_location='cpu')
 
 
 def predict(frame):
@@ -28,18 +13,11 @@ def predict(frame):
         return None, None
 
     # gradio gives RGB frames, the face detector expects BGR like opencv's VideoCapture
-    face_crop = crop_face_from_frame(cv.cvtColor(frame, cv.COLOR_RGB2BGR))
-    if face_crop is None:
+    result = inference.predict(model, cv.cvtColor(frame, cv.COLOR_RGB2BGR))
+    if result is None:
         return {'No face detected': 1.0}, None
 
-    face_crop_rgb = cv.cvtColor(face_crop, cv.COLOR_BGR2RGB)
-    face_crop_transformed = transform_image_for_inference(Image.fromarray(face_crop_rgb))
-
-    with torch.no_grad():
-        scores = model(face_crop_transformed.unsqueeze(0))
-    probs = torch.softmax(scores, 1)[0]
-
-    # class indices follow ImageFolder's alphabetical order: looking, not_looking
+    probs, face_crop_rgb = result
     return {'Looking': probs[0].item(), 'Not Looking': probs[1].item()}, face_crop_rgb
 
 
