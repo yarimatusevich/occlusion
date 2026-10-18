@@ -79,7 +79,7 @@ def start_live_webcam_feed(model, max_length_frames=None, save_labeled_frames=Fa
 
 if __name__ == '__main__':
     model = OcclusionModel()
-    state_dict = torch.load('model.pth', weights_only=True, map_location='mps')
+    state_dict = torch.load('ml/models/model.pth', weights_only=True, map_location='mps')
 
     # loading model and setting to evaluation mode
     model.load_state_dict(state_dict)
